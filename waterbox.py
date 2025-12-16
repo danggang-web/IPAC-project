@@ -221,23 +221,48 @@ def build_system_model(tank_type, K, T1, T2, L, Kp, Ti, Td, control_alg, use_pad
 
 
 ## 3. 性能指标计算
+## 3. 性能指标计算（修复版）
 def calculate_performance(t, y, setpoint=1.0):
-    """计算阶跃响应性能指标"""
-    y_norm = y / setpoint if setpoint != 0 else y
+    """计算阶跃响应性能指标（增加异常处理）"""
+    # 防除零 + 数据有效性检查
+    if setpoint == 0:
+        setpoint = 1e-6  # 避免分母为0
+    if len(y) == 0 or np.all(y == 0):
+        return {
+            "上升时间(s)": 0.0,
+            "超调量(%)": 0.0,
+            "稳态误差": 0.0
+        }
 
+    y_norm = y / setpoint
     # 上升时间（0.1→0.9）
-    idx_10 = np.where(y_norm >= 0.1)[0][0] if np.any(y_norm >= 0.1) else 0
-    idx_90 = np.where(y_norm >= 0.9)[0][0] if np.any(y_norm >= 0.9) else len(t) - 1
-    rise_time = t[idx_90] - t[idx_10]
+    try:
+        idx_10 = np.where(y_norm >= 0.1)[0][0] if np.any(y_norm >= 0.1) else len(t) - 1
+        idx_90 = np.where(y_norm >= 0.9)[0][0] if np.any(y_norm >= 0.9) else len(t) - 1
+        rise_time = t[idx_90] - t[idx_10]
+        rise_time = max(0, rise_time)  # 避免负数
+    except:
+        rise_time = 0.0
 
-    # 超调量
-    max_y = np.max(y)
-    overshoot = ((max_y - setpoint) / setpoint * 100) if setpoint != 0 else 0
-    overshoot = max(0, overshoot)
+    # 超调量（增加NaN/inf处理）
+    try:
+        max_y = np.max(y)
+        overshoot = ((max_y - setpoint) / setpoint) * 100
+        # 处理非数值/负数超调
+        if np.isnan(overshoot) or np.isinf(overshoot):
+            overshoot = 0.0
+        overshoot = max(0, overshoot)  # 无超调时为0
+    except:
+        overshoot = 0.0
 
-    # 稳态误差
-    steady_state = y[-10:] if len(y) >= 10 else y
-    steady_error = abs(np.mean(steady_state) - setpoint)
+    # 稳态误差（增加异常处理）
+    try:
+        steady_state = y[-10:] if len(y) >= 10 else y
+        steady_error = abs(np.mean(steady_state) - setpoint)
+        if np.isnan(steady_error) or np.isinf(steady_error):
+            steady_error = 0.0
+    except:
+        steady_error = 0.0
 
     return {
         "上升时间(s)": round(rise_time, 2),
