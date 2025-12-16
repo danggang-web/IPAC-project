@@ -8,69 +8,40 @@ import streamlit as st
 import control
 import matplotlib
 import matplotlib.pyplot as plt
+from PIL import Image
 
-# ========= 中文显示彻底修复 =========
+# ========== 页面设置 ==========
+st.set_page_config(layout="wide")
+
+# ========== 中文显示（不依赖本地字体） ==========
 matplotlib.rcParams['font.sans-serif'] = [
-    'SimHei', 'Microsoft YaHei',
-    'PingFang SC', 'Heiti SC',
-    'WenQuanYi Zen Hei', 'Arial Unicode MS'
+    'SimHei', 'Microsoft YaHei', 'PingFang SC',
+    'Heiti SC', 'WenQuanYi Zen Hei', 'Arial Unicode MS'
 ]
 matplotlib.rcParams['axes.unicode_minus'] = False
-# ===================================
-import os
-import streamlit as st
 
-# ====== LOGO 强制绝对路径 ======
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOGO_PATH = os.path.join(BASE_DIR, "assets", "ipac_logo.png")
+# ========== LOGO 上传（彻底绕开路径问题） ==========
+with st.expander("📤 上传 IPAC 实验室 Logo（首次运行需要）", expanded=True):
+    uploaded_logo = st.file_uploader(
+        "请选择 Logo 文件（png / jpg）",
+        type=["png", "jpg", "jpeg"]
+    )
 
-st.write("【调试】BASE_DIR =", BASE_DIR)
-st.write("【调试】LOGO_PATH =", LOGO_PATH)
-st.write("【调试】文件是否存在 =", os.path.exists(LOGO_PATH))
+if uploaded_logo is not None:
+    logo_img = Image.open(uploaded_logo)
+    st.image(logo_img, width=70)
 
-# ====== 显示 Logo ======
-if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH, width=60)
-else:
-    st.error("❌ 未找到 ipac_logo.png，请检查 assets 目录")
-
-
-# ========= 页面设置 =========
-st.set_page_config(layout="wide")
-# ===== 顶部标头 =====
+# ========== 标题 ==========
 st.markdown("""
-<div style="
-    background-color:#1976D2;
-    padding:14px;
-    border-radius:8px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:15px;
-">
-""", unsafe_allow_html=True)
-
-st.image(
-    r"C:\Users\aspir\PyCharmMiscProject\控制课程代码\最新环节\assets\ipac_logo.png",
-    width=48
-)
-
-
-st.markdown("""
-<div style="color:white;text-align:center;">
-    <div style="font-size:22px;font-weight:700;">
-        太原理工大学 IPAC 实验室
-    </div>
-    <div style="font-size:16px;">
-        水箱系统建模与控制综合实验平台
-    </div>
-</div>
+<div style="background-color:#1976D2;padding:15px;border-radius:8px">
+<h2 style="color:white;text-align:center">
+太原理工大学 IPAC 实验室<br>
+水箱系统建模与控制综合实验平台
+</h2>
 </div>
 """, unsafe_allow_html=True)
 
-
-
-# ========= 淡蓝色模块样式 =========
+# ========== 淡蓝色模块 ==========
 def blue_block(title):
     st.markdown(f"""
     <div style="
@@ -84,85 +55,57 @@ def blue_block(title):
 def end_block():
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ========= 左侧参数 =========
+# ========== 侧边栏 ==========
 with st.sidebar:
-    st.header("参数设置")
+    st.header("⚙️ 参数设置")
 
-    model_type = st.selectbox("水箱模型", ["单水箱（一阶）", "双水箱（二阶）"])
-    controller_type = st.selectbox("控制算法", ["经典PID", "增量PID", "模糊PID"])
+    model_type = st.selectbox(
+        "水箱模型选择",
+        ["单水箱（一阶）", "双水箱（二阶）"]
+    )
+
+    controller_type = st.selectbox(
+        "控制算法",
+        ["经典 PID", "增量 PID", "模糊 PID"]
+    )
 
     st.subheader("PID 参数整定")
     Kp = st.slider("Kp", 0.0, 10.0, 2.0)
     Ki = st.slider("Ki", 0.0, 5.0, 1.0)
     Kd = st.slider("Kd", 0.0, 5.0, 0.5)
 
-    st.markdown("---")
-    st.subheader("📐 自动 PID 参数整定")
-
-    tune_method = st.selectbox(
-        "选择整定方法",
-        ["不使用", "Ziegler–Nichols (ZN)", "IMC 经验整定"]
-    )
-
-    if st.button("一键自动整定"):
-        if tune_method != "不使用":
-
-            # ===== 单水箱（一阶）=====
-            if model_type == "单水箱（一阶）":
-                K = 1.0
-                tau = 5.0
-
-                if tune_method == "Ziegler–Nichols (ZN)":
-                    Kp = 1.2 * tau / K
-                    Ki = Kp / (2 * tau)
-                    Kd = 0.5 * tau * Kp
-
-                elif tune_method == "IMC 经验整定":
-                    lam = tau
-                    Kp = tau / (K * lam)
-                    Ki = Kp / tau
-                    Kd = 0.0
-
-            # ===== 双水箱（二阶）=====
-            else:
-                T1, T2 = 5.0, 2.0
-                tau_eq = T1 + T2
-
-                if tune_method == "Ziegler–Nichols (ZN)":
-                    Kp = 1.2 * tau_eq
-                    Ki = Kp / (2 * tau_eq)
-                    Kd = 0.5 * tau_eq * Kp
-
-                elif tune_method == "IMC 经验整定":
-                    lam = tau_eq
-                    Kp = tau_eq / lam
-                    Ki = Kp / tau_eq
-                    Kd = 0.0
-
-            st.success("✅ PID 参数已自动整定并更新")
-
-# ========= 系统模型 =========
+# ========== 系统模型 ==========
 if model_type == "单水箱（一阶）":
     G = control.tf([1], [5, 1])
 else:
     G = control.tf([1], [10, 6, 1])
 
-# ========= 控制器 =========
+# ========== 控制器（统一等效 PID） ==========
 C = control.tf([Kd, Kp, Ki], [1, 0])
 
 sys = control.feedback(C * G, 1)
 
-# ========= 性能指标 =========
+# ========== 性能指标 ==========
 t, y = control.step_response(sys)
 y_final = y[-1]
-rise_time = t[np.where(y >= 0.9 * y_final)[0][0]] if y_final != 0 else None
-overshoot = (np.max(y) - y_final) / y_final * 100 if y_final != 0 else None
+
+rise_time = (
+    t[np.where(y >= 0.9 * y_final)[0][0]]
+    if y_final != 0 and np.any(y >= 0.9 * y_final)
+    else None
+)
+
+overshoot = (
+    (np.max(y) - y_final) / y_final * 100
+    if y_final != 0 else None
+)
+
 steady_error = abs(1 - y_final)
 
 def show(x):
     return "--" if x is None else round(float(x), 4)
 
-# ========= 第一排 =========
+# ========== 第一排 ==========
 col1, col2 = st.columns(2)
 
 with col1:
@@ -181,21 +124,22 @@ with col2:
     st.metric("稳态误差", show(steady_error))
     end_block()
 
-# ========= 第二排 =========
+# ========== 第二排 ==========
 col3, col4 = st.columns(2)
 
 with col3:
     blue_block("零极点图")
     fig, ax = plt.subplots()
-    ax.scatter(poles.real, poles.imag, marker='x', color='red', s=80, label='极点')
-    ax.scatter(zeros.real, zeros.imag, marker='o',
-               facecolors='none', edgecolors='blue',
-               s=80, label='零点')
+    ax.scatter(poles.real, poles.imag,
+               marker='x', color='red', s=80, label='极点')
+    ax.scatter(zeros.real, zeros.imag,
+               marker='o', facecolors='none',
+               edgecolors='blue', s=80, label='零点')
     ax.axhline(0, color='black')
     ax.axvline(0, color='black')
     ax.set_xlabel("实轴")
     ax.set_ylabel("虚轴")
-    ax.legend(prop={'size': 10})
+    ax.legend()
     ax.grid(True)
     st.pyplot(fig)
     end_block()
@@ -206,12 +150,12 @@ with col4:
     ax.plot(t, y, label="阶跃响应")
     ax.set_xlabel("时间 (s)")
     ax.set_ylabel("输出")
-    ax.legend(prop={'size': 10})
+    ax.legend()
     ax.grid(True)
     st.pyplot(fig)
     end_block()
 
-# ========= 第三排 =========
+# ========== 第三排 ==========
 col5, col6 = st.columns(2)
 
 with col5:
@@ -230,19 +174,17 @@ with col6:
     st.pyplot(fig)
     end_block()
 
-# ========= 稳定性说明 =========
-blue_block("系统稳定性判读说明（零极点图与根轨迹）")
+# ========== 稳定性说明 ==========
+blue_block("🔍 系统稳定性判读说明（零极点图与根轨迹）")
 st.markdown("""
-🔍 **系统稳定性判读说明**
-
-1. 系统稳定性由 **极点（×）** 决定，零点（○）仅用于分析零极点关系  
+1. 系统稳定性由 **极点（×）** 决定，零点（○）仅用于分析结构关系  
 2. 所有极点实部 < 0 → **系统稳定**  
 3. 若存在极点实部 > 0 → **系统不稳定**  
 4. 阶跃响应若持续增大或振荡，说明系统进入不稳定区  
 """)
 end_block()
 
-# ========= 版权 =========
+# ========== 版权 ==========
 st.markdown("""
 <hr>
 <div style="text-align:center;color:gray">
