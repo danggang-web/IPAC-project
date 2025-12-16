@@ -18,9 +18,22 @@ matplotlib.rcParams['font.sans-serif'] = [
 matplotlib.rcParams['axes.unicode_minus'] = False
 # ===================================
 import os
-st.write("当前目录：", os.getcwd())
-st.write("当前文件：", os.listdir("."))
-st.write("assets 内容：", os.listdir("assets") if os.path.exists("assets") else "assets 不存在")
+import streamlit as st
+
+# ====== LOGO 强制绝对路径 ======
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "ipac_logo.png")
+
+st.write("【调试】BASE_DIR =", BASE_DIR)
+st.write("【调试】LOGO_PATH =", LOGO_PATH)
+st.write("【调试】文件是否存在 =", os.path.exists(LOGO_PATH))
+
+# ====== 显示 Logo ======
+if os.path.exists(LOGO_PATH):
+    st.image(LOGO_PATH, width=60)
+else:
+    st.error("❌ 未找到 ipac_logo.png，请检查 assets 目录")
+
 
 # ========= 页面设置 =========
 st.set_page_config(layout="wide")
