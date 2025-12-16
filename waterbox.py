@@ -24,7 +24,7 @@ st.write("assets 内容：", os.listdir("assets") if os.path.exists("assets") el
 
 # ========= 页面设置 =========
 st.set_page_config(layout="wide")
-
+# ===== 顶部标头 =====
 st.markdown("""
 <div style="
     background-color:#1976D2;
@@ -35,21 +35,22 @@ st.markdown("""
     justify-content:center;
     gap:15px;
 ">
-    <img src="data:image/png;base64,{logo}" style="height:48px;">
-    <div style="color:white;text-align:center;">
-        <div style="font-size:22px;font-weight:700;">
-            太原理工大学 IPAC 实验室
-        </div>
-        <div style="font-size:16px;">
-            水箱系统建模与控制综合实验平台
-        </div>
+""", unsafe_allow_html=True)
+
+st.image("assets/ipac_logo.png", width=48)
+
+st.markdown("""
+<div style="color:white;text-align:center;">
+    <div style="font-size:22px;font-weight:700;">
+        太原理工大学 IPAC 实验室
+    </div>
+    <div style="font-size:16px;">
+        水箱系统建模与控制综合实验平台
     </div>
 </div>
-""".format(
-    logo=__import__("base64").b64encode(
-        open("assets/ipac_logo.png", "rb").read()
-    ).decode()
-), unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
+
 
 
 # ========= 淡蓝色模块样式 =========
