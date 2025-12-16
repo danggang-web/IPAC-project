@@ -1,277 +1,236 @@
-# =========================================================
-# 水箱液位控制系统综合仿真平台
-# 太原理工大学 IPAC 实验室 © 2025
-# =========================================================
-
 import streamlit as st
 import numpy as np
-import control as ctrl
-import plotly.graph_objects as go
-import plotly.subplots as sp
-from scipy.signal import tf2zpk
+import control
+import matplotlib.pyplot as plt
 
-# =========================================================
-# 页面设置
-# =========================================================
-def tf_to_latex(sys, var='s'):
-    """
-    将 control.TransferFunction 转为 LaTeX 字符串
-    兼容常数 / 一阶 / 二阶系统
-    """
-    def ensure_1d_array(x):
-        x = np.array(x).flatten()
-        if x.size == 0:
-            return np.array([0.0])
-        return x
-
-    num = ensure_1d_array(sys.num[0][0])
-    den = ensure_1d_array(sys.den[0][0])
-
-    def poly_to_latex(p):
-        p = ensure_1d_array(p)
-        deg = len(p) - 1
-        terms = []
-
-        for i, coef in enumerate(p):
-            if abs(coef) < 1e-10:
-                continue
-            power = deg - i
-            coef_str = f"{coef:.3g}"
-
-            if power == 0:
-                terms.append(coef_str)
-            elif power == 1:
-                terms.append(f"{coef_str}{var}")
-            else:
-                terms.append(f"{coef_str}{var}^{{{power}}}")
-
-        return " + ".join(terms) if terms else "0"
-
-    num_latex = poly_to_latex(num)
-    den_latex = poly_to_latex(den)
-
-    return rf"\frac{{{num_latex}}}{{{den_latex}}}"
-
-
-
+# ======================================================
+# 页面配置
+# ======================================================
 st.set_page_config(
-    page_title="水箱液位控制系统仿真平台",
+    page_title="太原理工大学 IPAC — 水箱在线仿真平台",
     layout="wide"
 )
 
-st.title("💧 水箱液位控制系统仿真平台")
-st.markdown("**太原理工大学 IPAC 实验室 | 过程控制教学平台**")
-st.divider()
-
-# =========================================================
-# 工具函数
-# =========================================================
-
-def build_plant(model_type, K, T1, T2):
-    if model_type == "单水箱（一阶）":
-        return ctrl.tf([K], [T1, 1])
-    else:
-        return ctrl.tf([K], np.convolve([T1, 1], [T2, 1]))
-
-
-def build_controller(ctrl_type, Kp, Ti, Td):
-    if ctrl_type == "经典 PID":
-        return ctrl.tf([Kp * Td, Kp, Kp / Ti], [1, 0])
-
-    elif ctrl_type == "增量 PID":
-        # 教学等效形式
-        return ctrl.tf([Kp * Td, Kp], [1, 0])
-
-    else:  # 模糊 PID（简化教学模型）
-        Kp_f = 0.8 * Kp
-        Ti_f = 1.2 * Ti
-        Td_f = 0.5 * Td
-        return ctrl.tf([Kp_f * Td_f, Kp_f, Kp_f / Ti_f], [1, 0])
-
-
-def performance_metrics(t, y):
-    try:
-        t10 = t[np.where(y >= 0.1)[0][0]]
-        t90 = t[np.where(y >= 0.9)[0][0]]
-        rise_time = t90 - t10
-    except:
-        rise_time = 0.0
-
-    overshoot = max(0, (np.max(y) - 1) * 100)
-    steady_error = abs(y[-1] - 1)
-
-    return round(rise_time, 2), round(overshoot, 2), round(steady_error, 4)
-
-# =========================================================
-# 侧边栏：参数与算法选择
-# =========================================================
-
-with st.sidebar:
-    st.header("⚙️ 系统建模")
-
-    model_type = st.selectbox(
-        "水箱模型",
-        ["单水箱（一阶）", "双水箱（二阶）"]
-    )
-
-    K = st.slider("系统增益 K", 0.1, 5.0, 1.0, 0.1)
-    T1 = st.slider("时间常数 T1 (s)", 1.0, 30.0, 5.0, 1.0)
-
-    if model_type == "双水箱（二阶）":
-        T2 = st.slider("时间常数 T2 (s)", 1.0, 30.0, 8.0, 1.0)
-    else:
-        T2 = 0.0
-
-    st.header("🎯 控制算法")
-
-    ctrl_type = st.selectbox(
-        "控制策略",
-        ["经典 PID", "增量 PID", "模糊 PID"]
-    )
-
-    Kp = st.slider("Kp", 0.1, 20.0, 5.0, 0.1)
-    Ti = st.slider("Ti", 0.1, 30.0, 10.0, 0.5)
-    Td = st.slider("Td", 0.0, 10.0, 1.0, 0.1)
-
-# =========================================================
-# 系统构建
-# =========================================================
-
-G = build_plant(model_type, K, T1, T2)
-Gc = build_controller(ctrl_type, Kp, Ti, Td)
-
-G_open = ctrl.series(Gc, G)
-G_cl = ctrl.feedback(G_open, 1)
-
-# =========================================================
-# 传递函数公式显示
-# =========================================================
-
-st.subheader("📐 传递函数（公式显示）")
-
-st.latex(r"G(s) = " + tf_to_latex(G))
-st.latex(r"G_c(s) = " + tf_to_latex(Gc))
-st.latex(r"T(s) = \frac{G_c(s)G(s)}{1+G_c(s)G(s)}")
-
-# =========================================================
-# 零极点图
-# =========================================================
-
-st.subheader("📍 零极点分布图")
-
-z_o, p_o, _ = tf2zpk(G_open.num[0][0], G_open.den[0][0])
-_, p_c, _ = tf2zpk(G_cl.num[0][0], G_cl.den[0][0])
-
-fig_zp = go.Figure()
-
-fig_zp.add_trace(go.Scatter(
-    x=np.real(z_o), y=np.imag(z_o),
-    mode="markers", name="零点 ○",
-    marker=dict(symbol="circle", size=10)
-))
-
-fig_zp.add_trace(go.Scatter(
-    x=np.real(p_o), y=np.imag(p_o),
-    mode="markers", name="开环极点 ×",
-    marker=dict(symbol="x", size=10)
-))
-
-fig_zp.add_trace(go.Scatter(
-    x=np.real(p_c), y=np.imag(p_c),
-    mode="markers", name="闭环极点 ×",
-    marker=dict(symbol="x", size=12, color="red")
-))
-
-fig_zp.add_vline(x=0, line=dict(dash="dash"))
-fig_zp.update_layout(xaxis_title="Re", yaxis_title="Im", height=400)
-
-st.plotly_chart(fig_zp, use_container_width=True)
-
-# =========================================================
-# 阶跃响应 & 性能指标
-# =========================================================
-
-st.subheader("📊 阶跃响应与性能指标")
-
-t, y = ctrl.step_response(G_cl, T=np.linspace(0, 100, 1000))
-rise, over, err = performance_metrics(t, y)
-
-fig_step = go.Figure()
-fig_step.add_trace(go.Scatter(x=t, y=y, mode="lines", name="阶跃响应"))
-fig_step.add_hline(y=1, line=dict(dash="dash"))
-
-st.plotly_chart(fig_step, use_container_width=True)
-
-c1, c2, c3 = st.columns(3)
-c1.metric("上升时间 (s)", rise)
-c2.metric("超调量 (%)", over)
-c3.metric("稳态误差", err)
-
-# =========================================================
-# 根轨迹
-# =========================================================
-
-st.subheader("🌐 根轨迹图")
-
-rlist, klist = ctrl.root_locus(G_open, plot=False)
-
-fig_rl = go.Figure()
-for i in range(rlist.shape[0]):
-    fig_rl.add_trace(go.Scatter(
-        x=np.real(rlist[i]),
-        y=np.imag(rlist[i]),
-        mode="lines"
-    ))
-
-fig_rl.add_vline(x=0, line=dict(dash="dash"))
-fig_rl.update_layout(xaxis_title="Re", yaxis_title="Im", height=400)
-
-st.plotly_chart(fig_rl, use_container_width=True)
-
-# =========================================================
-# 波特图
-# =========================================================
-
-st.subheader("📉 波特图")
-
-omega, mag, phase = ctrl.bode(G_open, plot=False)
-
-fig_bode = sp.make_subplots(rows=2, cols=1,
-    subplot_titles=("幅频特性 (dB)", "相频特性 (deg)")
-)
-
-fig_bode.add_trace(
-    go.Scatter(x=np.log10(omega), y=20*np.log10(mag)),
-    row=1, col=1
-)
-fig_bode.add_trace(
-    go.Scatter(x=np.log10(omega), y=phase),
-    row=2, col=1
-)
-
-fig_bode.update_layout(height=600)
-st.plotly_chart(fig_bode, use_container_width=True)
-
-# =========================================================
-# 稳定性说明模块
-# =========================================================
-
-st.subheader("🔍 系统稳定性判读说明（零极点图与根轨迹）")
-
+# ======================================================
+# 主题 CSS（对标 HTML）
+# ======================================================
 st.markdown("""
-1. **系统稳定性由极点（×）决定**，零点（○）仅用于分析零极点关系。  
-2. **所有极点实部 < 0 → 系统稳定**；若存在极点实部 > 0 → 系统不稳定。  
-3. **阶跃响应持续增大或振荡**，说明系统进入不稳定区。
-""")
+<style>
+:root { --blue:#0077cc; --card-bg:#ffffff; --page-bg:#f5f7fa; }
 
-# =========================================================
+html, body, [class*="css"] {
+  background-color: var(--page-bg);
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+}
+
+.header {
+  height:60px;
+  background:#007acc;
+  color:white;
+  display:flex;
+  align-items:center;
+  padding:0 20px;
+  font-size:22px;
+  font-weight:bold;
+  border-radius:6px;
+  margin-bottom:18px;
+}
+
+.card {
+  background:var(--card-bg);
+  border-radius:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  padding:14px;
+  margin-bottom:18px;
+}
+
+.card h3 {
+  margin-top:0;
+  color:var(--blue);
+  text-align:center;
+  font-size:16px;
+}
+
+.metrics table {
+  width:100%;
+  border-collapse:collapse;
+  text-align:center;
+}
+.metrics th, .metrics td {
+  border:1px solid #e6eef6;
+  padding:6px;
+}
+
+.stability {
+  padding:18px;
+  background:#eef7ff;
+  border-left:6px solid var(--blue);
+  border-radius:8px;
+  line-height:1.6;
+  color:#073b6b;
+}
+
+.footer {
+  text-align:center;
+  padding:12px;
+  background:#f0f0f0;
+  font-size:14px;
+  color:#555;
+  margin-top:18px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ======================================================
+# Header
+# ======================================================
+st.markdown("""
+<div class="header">
+太原理工大学 IPAC — 水箱在线仿真平台
+</div>
+""", unsafe_allow_html=True)
+
+# ======================================================
+# 左右布局
+# ======================================================
+left, right = st.columns([1.1, 2.2])
+
+# ======================================================
+# 左侧：参数与控制
+# ======================================================
+with left:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>PID 与水箱参数</h3>", unsafe_allow_html=True)
+
+    Kp = st.slider("控制 Kp", 0.0, 20.0, 5.0, 0.1)
+    Ki = st.slider("控制 Ki", 0.0, 10.0, 2.7, 0.01)
+    Kd = st.slider("控制 Kd", 0.0, 5.0, 4.7, 0.01)
+
+    dt = st.slider("采样时间 dt (s)", 0.005, 0.5, 0.05, 0.005)
+
+    tank_type = st.selectbox("水箱类型", ["单水箱（一阶）", "双水箱（二阶）"])
+    ctrl_type = st.selectbox("控制算法", ["经典 PID", "增量 PID", "模糊 PID"])
+
+    K = st.number_input("被控对象增益 K", value=1.0)
+
+    if tank_type == "单水箱（一阶）":
+        T1 = st.number_input("时间常数 τ (s)", value=5.0)
+    else:
+        T1 = st.number_input("时间常数 T1 (s)", value=2.0)
+        T2 = st.number_input("时间常数 T2 (s)", value=5.0)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# 系统建模
+# ======================================================
+if tank_type == "单水箱（一阶）":
+    G = control.tf([K], [T1, 1])
+else:
+    G = control.tf([K], [T1*T2, T1+T2, 1])
+
+C = control.tf([Kd, Kp, Ki], [1, 0])
+sys_cl = control.feedback(C * G)
+
+# ======================================================
+# 右侧：图形与分析
+# ======================================================
+with right:
+
+    # ---------- 传递函数 & 零极点 ----------
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>闭环传递函数（零极点形式）</h3>", unsafe_allow_html=True)
+
+    zeros = control.zeros(sys_cl)
+    poles = control.poles(sys_cl)
+
+    z_latex = " ".join([f"(s-({z.real:.2f}))" for z in zeros]) or "1"
+    p_latex = " ".join([f"(s-({p.real:.2f}))" for p in poles])
+
+    st.latex(rf"G_{{cl}}(s)=\frac{{{z_latex}}}{{{p_latex}}}")
+
+    fig_pz, ax = plt.subplots()
+    control.pzmap(sys_cl, ax=ax, grid=True)
+    st.pyplot(fig_pz)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---------- 阶跃响应 ----------
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>阶跃响应</h3>", unsafe_allow_html=True)
+
+    t, y = control.step_response(sys_cl)
+    fig, ax = plt.subplots()
+    ax.plot(t, y, label="闭环输出")
+    ax.plot(t, np.ones_like(t), "--", label="参考输入")
+    ax.set_xlabel("时间 (s)")
+    ax.set_ylabel("水位")
+    ax.grid()
+    ax.legend()
+    st.pyplot(fig)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---------- 根轨迹 ----------
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>根轨迹</h3>", unsafe_allow_html=True)
+
+    fig_rl, ax = plt.subplots()
+    control.root_locus(G, ax=ax, grid=True)
+    st.pyplot(fig_rl)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---------- 波特图 ----------
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>波特图</h3>", unsafe_allow_html=True)
+
+    fig_bode, ax = plt.subplots(2, 1, figsize=(6, 6))
+    control.bode_plot(sys_cl, ax=ax, grid=True)
+    st.pyplot(fig_bode)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# 性能指标
+# ======================================================
+y_final = y[-1]
+rise_time = t[np.where(y >= 0.9*y_final)[0][0]]
+overshoot = (np.max(y)-y_final)/y_final*100
+steady_error = abs(1-y_final)
+
+st.markdown(f"""
+<div class="card metrics">
+<h3>性能指标</h3>
+<table>
+<tr><th>上升时间 t<sub>r</sub></th><th>超调量 M<sub>p</sub> (%)</th><th>稳态误差 e<sub>ss</sub></th></tr>
+<tr>
+<td>{rise_time:.3f}</td>
+<td>{overshoot:.2f}</td>
+<td>{steady_error:.4f}</td>
+</tr>
+</table>
+</div>
+""", unsafe_allow_html=True)
+
+# ======================================================
+# 稳定性说明
+# ======================================================
+st.markdown("""
+<div class="stability">
+<h3>🔍 系统稳定性判读说明（零极点图与根轨迹）</h3>
+<p><strong>1.</strong> 系统稳定性由 <strong>极点（×）</strong> 决定，零点（○）仅用于分析零极点关系。</p>
+<p><strong>2.</strong> 所有极点实部 &lt; 0 → <span style="color:green;font-weight:700;">系统稳定</span>；
+存在极点实部 &gt; 0 → <span style="color:red;font-weight:700;">不稳定</span>。</p>
+<p><strong>3.</strong> 阶跃响应若持续增大或振荡，说明系统进入不稳定区。</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ======================================================
 # 页脚
-# =========================================================
-
-st.markdown("---")
-st.markdown(
-    "<div style='text-align:center;color:#666;'>"
-    "太原理工大学 IPAC 实验室 © 2025"
-    "</div>",
-    unsafe_allow_html=True
-)
+# ======================================================
+st.markdown("""
+<div class="footer">
+太原理工大学 IPAC 实验室 © 2025
+</div>
+""", unsafe_allow_html=True)
