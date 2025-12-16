@@ -17,6 +17,10 @@ matplotlib.rcParams['font.sans-serif'] = [
 ]
 matplotlib.rcParams['axes.unicode_minus'] = False
 # ===================================
+import os
+st.write("当前目录：", os.getcwd())
+st.write("当前文件：", os.listdir("."))
+st.write("assets 内容：", os.listdir("assets") if os.path.exists("assets") else "assets 不存在")
 
 # ========= 页面设置 =========
 st.set_page_config(layout="wide")
