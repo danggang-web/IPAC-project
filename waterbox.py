@@ -1,5 +1,5 @@
 # =========================================================
-# 水箱系统建模与控制分析平台（UI增强完整版）
+# 水箱系统建模与控制分析平台（中文显示修复完整版）
 # 太原理工大学 IPAC 实验室 © 2025
 # =========================================================
 
@@ -7,10 +7,18 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 import control as ctl
+from matplotlib.font_manager import FontProperties
 
-# -----------------------------
-# 页面与样式
-# -----------------------------
+# =========================================================
+# 中文字体（关键）
+# =========================================================
+ch_font = FontProperties(family='SimHei')
+
+plt.rcParams["axes.unicode_minus"] = False
+
+# =========================================================
+# 页面配置 & 样式
+# =========================================================
 st.set_page_config(layout="wide")
 
 st.markdown("""
@@ -48,12 +56,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Matplotlib 中文支持
-# -----------------------------
-plt.rcParams["font.sans-serif"] = ["SimHei"]
-plt.rcParams["axes.unicode_minus"] = False
-
 # =========================================================
 # 工具函数
 # =========================================================
@@ -79,11 +81,7 @@ with st.sidebar:
     st.header("⚙️ 系统配置")
 
     tank_type = st.radio("水箱模型", ["单水箱（一阶）", "双水箱（二阶）"])
-
-    ctrl_type = st.selectbox(
-        "控制器类型", ["经典 PID", "增量 PID", "模糊 PID"]
-    )
-
+    ctrl_type = st.selectbox("控制器类型", ["经典 PID", "增量 PID", "模糊 PID"])
     tune_method = st.radio("整定方式", ["手动整定", "ZN 临界比例法"])
 
     Kp = st.slider("Kp", 0.0, 10.0, 2.0)
@@ -132,7 +130,7 @@ c1, c2 = st.columns(2)
 
 with c1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("📐 在线零极点公式")
+    st.subheader("📐 在线零极点显示（公式）")
     st.latex(r"G(s)=\frac{\prod (s-z_i)}{\prod (s-p_i)}")
     st.write("零点 z：", np.round(zeros, 3))
     st.write("极点 p：", np.round(poles, 3))
@@ -147,33 +145,43 @@ with c2:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# 第二行：零极点图
+# 第二行
 # =========================================================
 c3, c4 = st.columns(2)
 
 with c3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📍 零极点图（左右半平面区分）")
+
     fig, ax = plt.subplots()
     ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.plot(np.real(poles), np.imag(poles), 'rx', markersize=10, label="极点")
-    ax.plot(np.real(zeros), np.imag(zeros), 'bo', markersize=8, label="零点")
-    ax.set_xlabel("Re")
-    ax.set_ylabel("Im")
+
+    ax.plot(np.real(poles), np.imag(poles),
+            'rx', markersize=10, label="极点（×）")
+    ax.plot(np.real(zeros), np.imag(zeros),
+            'bo', markersize=8, label="零点（○）")
+
+    ax.set_xlabel("实部 Re", fontproperties=ch_font)
+    ax.set_ylabel("虚部 Im", fontproperties=ch_font)
+    ax.legend(prop=ch_font)
     ax.grid(True)
-    ax.legend()
+
     st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with c4:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📈 阶跃响应")
+
     fig, ax = plt.subplots()
     ax.plot(t, y, label="系统响应")
-    ax.set_xlabel("时间 (s)")
-    ax.set_ylabel("液位")
-    ax.grid()
-    ax.legend()
+    ax.plot(t, np.ones_like(t), "--", label="参考输入")
+
+    ax.set_xlabel("时间 (s)", fontproperties=ch_font)
+    ax.set_ylabel("液位", fontproperties=ch_font)
+    ax.legend(prop=ch_font)
+    ax.grid(True)
+
     st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -185,16 +193,27 @@ c5, c6 = st.columns(2)
 with c5:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🧭 根轨迹")
+
     fig, ax = plt.subplots()
     ctl.root_locus(G, ax=ax, grid=True)
+
+    ax.set_xlabel("实部 Re", fontproperties=ch_font)
+    ax.set_ylabel("虚部 Im", fontproperties=ch_font)
+
     st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with c6:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📐 波特图")
+
     fig, ax = plt.subplots(2, 1)
     ctl.bode_plot(sys_cl, ax=ax)
+
+    ax[0].set_ylabel("幅值 (dB)", fontproperties=ch_font)
+    ax[1].set_ylabel("相位 (deg)", fontproperties=ch_font)
+    ax[1].set_xlabel("频率 (rad/s)", fontproperties=ch_font)
+
     st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -206,14 +225,17 @@ st.markdown("""
 ### 🔍 系统稳定性判读说明（零极点图与根轨迹）
 
 1. 系统稳定性由 **极点（×）** 决定  
-2. 所有极点实部 < 0 → **系统稳定**  
-3. 存在极点实部 > 0 → **系统不稳定**  
-4. 阶跃响应发散或持续振荡 → 进入不稳定区
+2. 零点（○）仅用于零极点关系分析  
+3. 所有极点实部 < 0 → **系统稳定**  
+4. 存在极点实部 > 0 → **系统不稳定**  
+5. 阶跃响应发散或持续振荡 → 进入不稳定区
 """)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
-# 版权
+# 页脚
 # =========================================================
-st.markdown('<div class="footer">太原理工大学 IPAC 实验室 © 2025</div>',
-            unsafe_allow_html=True)
+st.markdown(
+    '<div class="footer">太原理工大学 IPAC 实验室 © 2025</div>',
+    unsafe_allow_html=True
+)
