@@ -22,13 +22,31 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 st.set_page_config(layout="wide")
 
 st.markdown("""
-<div style="background-color:#1976D2;padding:15px;border-radius:8px">
-<h2 style="color:white;text-align:center">
-太原理工大学 IPAC 实验室<br>
-水箱系统建模与控制综合实验平台
-</h2>
+<div style="
+    background-color:#1976D2;
+    padding:14px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:15px;
+">
+    <img src="data:image/png;base64,{logo}" style="height:48px;">
+    <div style="color:white;text-align:center;">
+        <div style="font-size:22px;font-weight:700;">
+            太原理工大学 IPAC 实验室
+        </div>
+        <div style="font-size:16px;">
+            水箱系统建模与控制综合实验平台
+        </div>
+    </div>
 </div>
-""", unsafe_allow_html=True)
+""".format(
+    logo=__import__("base64").b64encode(
+        open("assets/ipac_logo.png", "rb").read()
+    ).decode()
+), unsafe_allow_html=True)
+
 
 # ========= 淡蓝色模块样式 =========
 def blue_block(title):
@@ -38,7 +56,7 @@ def blue_block(title):
         padding:12px;
         border-radius:8px;
         margin-bottom:10px;">
-    <h4>太原理工大学 IPAC 实验室 —— {title}</h4>
+    <h4>{title}</h4>
     """, unsafe_allow_html=True)
 
 def end_block():
