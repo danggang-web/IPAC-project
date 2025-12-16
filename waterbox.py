@@ -37,7 +37,11 @@ st.markdown("""
 ">
 """, unsafe_allow_html=True)
 
-st.image("assets/ipac_logo.png", width=48)
+st.image(
+    r"C:\Users\aspir\PyCharmMiscProject\控制课程代码\最新环节\assets\ipac_logo.png",
+    width=48
+)
+
 
 st.markdown("""
 <div style="color:white;text-align:center;">
