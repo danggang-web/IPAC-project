@@ -23,31 +23,43 @@ st.set_page_config(
 st.markdown("""
 <style>
 :root {
-  --blue: #2563eb;
-  --card-bg: #ffffff;
+  --blue:#0077cc;
+  --card-bg:#ffffff;
+  --page-bg:#f5f7fa;
+}
+
+html, body, .stApp {
+  background-color: var(--page-bg);
 }
 
 .block-container {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
 }
 
 .card {
   background: var(--card-bg);
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  padding: 8px 10px;
+  margin-bottom: 10px;
 }
 
 .card h3 {
-  margin: 4px 0 8px 0;
+  margin: 2px 0 6px 0;
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--blue);
+  font-weight: 600;
+}
+
+.small-text {
+  font-size: 12px;
+  color: #555;
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ======================================================
@@ -62,7 +74,8 @@ st.markdown("""
 # ======================================================
 # 左右布局
 # ======================================================
-left, right = st.columns([1.1, 2.2])
+left, right = st.columns([1.0, 2.0])
+
 
 # ======================================================
 # 左侧：参数与控制
@@ -87,6 +100,30 @@ with left:
     else:
         T1 = st.number_input("时间常数 T1 (s)", value=2.0)
         T2 = st.number_input("时间常数 T2 (s)", value=5.0)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<h3>PID 整定模块</h3>", unsafe_allow_html=True)
+
+    tune_method = st.selectbox(
+        "整定方法",
+        ["不整定", "Ziegler–Nichols", "经验整定"]
+    )
+
+    if st.button("一键整定 PID"):
+        if tune_method == "Ziegler–Nichols":
+            if tank_type == "单水箱（一阶）":
+                Ku = 2 * T1 / K
+                Tu = T1
+                Kp = 0.6 * Ku
+                Ki = 2 * Kp / Tu
+                Kd = Kp * Tu / 8
+            else:
+                Kp, Ki, Kd = 1.2, 0.8, 0.5
+
+        elif tune_method == "经验整定":
+            Kp, Ki, Kd = 3.0, 1.0, 0.2
+
+        st.success("PID 参数已自动整定")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -118,7 +155,7 @@ with right:
 
     st.latex(rf"G_{{cl}}(s)=\frac{{{z_latex}}}{{{p_latex}}}")
 
-    fig_pz, ax = plt.subplots()
+    fig_pz, ax = plt.subplots(figsize=(4.2, 3.2))
     control.pzmap(sys_cl, ax=ax, grid=True)
     st.pyplot(fig_pz)
 
@@ -129,7 +166,7 @@ with right:
     st.markdown("<h3>阶跃响应</h3>", unsafe_allow_html=True)
 
     t, y = control.step_response(sys_cl)
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(5.6, 3.2))
     ax.plot(t, y, label="闭环输出")
     ax.plot(t, np.ones_like(t), "--", label="参考输入")
     ax.set_xlabel("时间 (s)")
@@ -144,7 +181,7 @@ with right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("<h3>根轨迹</h3>", unsafe_allow_html=True)
 
-    fig_rl, ax = plt.subplots()
+    fig_rl, ax = plt.subplots(figsize=(4.2, 3.2))
     control.root_locus(G, ax=ax, grid=True)
     st.pyplot(fig_rl)
 
